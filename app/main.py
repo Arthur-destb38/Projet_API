@@ -34,7 +34,7 @@ class ScrapeRequest(BaseModel):
     """Request model for scraping endpoint"""
     subreddit: str = Field(default="Bitcoin", min_length=1, max_length=50)
     crypto: str = Field(default="BTC", min_length=2, max_length=10)
-    limit: int = Field(default=50, ge=1, le=500)
+    limit: int = Field(default=100, ge=1, le=1000)  # 100 par defaut, 1000 max
 
 
 class SentimentRequest(BaseModel):
@@ -46,14 +46,14 @@ class AnalyzeRequest(BaseModel):
     """Request model for full pipeline analysis"""
     crypto: str = Field(default="bitcoin", min_length=2, max_length=20)
     subreddit: str = Field(default="Bitcoin", min_length=1, max_length=50)
-    limit: int = Field(default=50, ge=1, le=500)
+    limit: int = Field(default=100, ge=1, le=1000)  # 100 par defaut, 1000 max
 
 
 class EconometricsRequest(BaseModel):
     """Request model for econometric analysis"""
     crypto: str = Field(default="bitcoin", min_length=2, max_length=20)
     subreddit: str = Field(default="Bitcoin", min_length=1, max_length=50)
-    limit: int = Field(default=100, ge=50, le=500)
+    limit: int = Field(default=200, ge=50, le=1000)  # 200 par defaut, 1000 max
     days: int = Field(default=30, ge=7, le=90)
     maxlag: int = Field(default=14, ge=1, le=21)
 
