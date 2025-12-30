@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - MoSEF 2024-2025</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #eee;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #f39c12, #e74c3c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+        .subtitle {
+            color: #888;
+            font-size: 1.1rem;
+        }
+        .card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .card h2 {
+            color: #f39c12;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+        .endpoints {
+            display: grid;
+            gap: 1rem;
+        }
+        .endpoint {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.8rem;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+        }
+        .method {
+            padding: 0.3rem 0.8rem;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.85rem;
+            min-width: 60px;
+            text-align: center;
+        }
+        .get { background: #27ae60; }
+        .post { background: #f39c12; }
+        .path {
+            font-family: monospace;
+            color: #3498db;
+        }
+        .desc {
+            color: #aaa;
+            flex: 1;
+        }
+        .tech-stack {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        .tech {
+            background: rgba(52, 152, 219, 0.2);
+            color: #3498db;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+        }
+        .pipeline {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .step {
+            text-align: center;
+            flex: 1;
+            min-width: 150px;
+        }
+        .step-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .step-title {
+            font-weight: bold;
+            margin-bottom: 0.3rem;
+        }
+        .step-desc {
+            font-size: 0.85rem;
+            color: #888;
+        }
+        .arrow {
+            font-size: 1.5rem;
+            color: #f39c12;
+        }
+        footer {
+            text-align: center;
+            margin-top: 3rem;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .status-codes {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .status-code {
+            font-family: monospace;
+            font-weight: bold;
+        }
+        .s200 { color: #27ae60; }
+        .s201 { color: #2ecc71; }
+        .s400 { color: #e67e22; }
+        .s404 { color: #e74c3c; }
+        .s500 { color: #c0392b; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🪙 Crypto Sentiment API</h1>
+            <p class="subtitle">Analyse de sentiment crypto via Reddit & FinBERT</p>
+            <p class="subtitle">Master 2 MoSEF Data Science - Webscraping & API</p>
+        </header>
+
+        <div class="card">
+            <h2>📊 Pipeline d'Analyse</h2>
+            <div class="pipeline">
+                <div class="step">
+                    <div class="step-icon">📱</div>
+                    <div class="step-title">Reddit Scraping</div>
+                    <div class="step-desc">Selenium</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="step">
+                    <div class="step-icon">🧹</div>
+                    <div class="step-title">Text Cleaning</div>
+                    <div class="step-desc">Regex, NLP</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="step">
+                    <div class="step-icon">🤖</div>
+                    <div class="step-title">FinBERT</div>
+                    <div class="step-desc">Sentiment Score</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="step">
+                    <div class="step-icon">💰</div>
+                    <div class="step-title">Prix Crypto</div>
+                    <div class="step-desc">CoinGecko API</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="step">
+                    <div class="step-icon">📈</div>
+                    <div class="step-title">Économétrie</div>
+                    <div class="step-desc">VAR, Granger</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🔌 Endpoints API</h2>
+            <div class="endpoints">
+                <div class="endpoint">
+                    <span class="method get">GET</span>
+                    <span class="path">/</span>
+                    <span class="desc">Page d'accueil (cette page)</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method get">GET</span>
+                    <span class="path">/health</span>
+                    <span class="desc">Health check - vérification du service</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method post">POST</span>
+                    <span class="path">/scrape</span>
+                    <span class="desc">Webscraping Reddit (subreddit, crypto, limit)</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method post">POST</span>
+                    <span class="path">/sentiment</span>
+                    <span class="desc">Analyse de sentiment FinBERT (texts[])</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method get">GET</span>
+                    <span class="path">/prices/{crypto}</span>
+                    <span class="desc">Prix actuel d'une crypto (CoinGecko)</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method post">POST</span>
+                    <span class="path">/analyze</span>
+                    <span class="desc">Pipeline complet: scrape + sentiment + price</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method post">POST</span>
+                    <span class="path">/econometrics</span>
+                    <span class="desc">Analyse économétrique: VAR, Granger causality</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📋 Status Codes HTTP</h2>
+            <div class="status-codes">
+                <div class="status">
+                    <span class="status-code s200">200</span>
+                    <span>OK - Requête réussie</span>
+                </div>
+                <div class="status">
+                    <span class="status-code s201">201</span>
+                    <span>Created - Ressource créée</span>
+                </div>
+                <div class="status">
+                    <span class="status-code s400">400</span>
+                    <span>Bad Request - Paramètres invalides</span>
+                </div>
+                <div class="status">
+                    <span class="status-code s404">404</span>
+                    <span>Not Found - Ressource non trouvée</span>
+                </div>
+                <div class="status">
+                    <span class="status-code s500">500</span>
+                    <span>Server Error - Erreur interne</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🛠️ Stack Technique</h2>
+            <div class="tech-stack">
+                <span class="tech">FastAPI</span>
+                <span class="tech">Selenium</span>
+                <span class="tech">BeautifulSoup</span>
+                <span class="tech">FinBERT</span>
+                <span class="tech">Transformers</span>
+                <span class="tech">CoinGecko API</span>
+                <span class="tech">Statsmodels</span>
+                <span class="tech">Pydantic</span>
+                <span class="tech">Uvicorn</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📖 Documentation</h2>
+            <p>Accédez à la documentation interactive Swagger UI:</p>
+            <p style="margin-top: 0.5rem;">
+                <a href="/docs">📄 /docs</a> - Swagger UI (interactif)
+            </p>
+            <p>
+                <a href="/redoc">📚 /redoc</a> - ReDoc (documentation)
+            </p>
+            <p>
+                <a href="/openapi.json">📋 /openapi.json</a> - Schéma OpenAPI
+            </p>
+        </div>
+
+        <footer>
+            <p>Projet Webscraping & API - Master 2 MoSEF Data Science 2024-2025</p>
+            <p>Sarra Ben Yahia | José Ángel García Sánchez</p>
+        </footer>
+    </div>
+</body>
+</html>
