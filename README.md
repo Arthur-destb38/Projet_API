@@ -23,3 +23,10 @@ Prérequis rapides:
   `python Projet_API/scripts/scrape_reddit_http.py --query "bitcoin OR ethereum" --subreddit CryptoCurrency --limit 100 --output Projet_API/data/raw/reddit_http.jsonl`
 - Pourquoi ça marche : old.reddit.com expose un endpoint JSON public qui évite cookies/captcha; les données (titre+texte, auteur, score, commentaires, lien, timestamp) sont directement accessibles.
 - Fichier généré (exécution réussie) : `Projet_API/data/raw/reddit_http.jsonl` (100 posts).
+
+## Batch et normalisation
+- Batch multi-queries/subreddits :\
+  `python Projet_API/scripts/run_reddit_batch.py` \
+  (lance les 4 scrapes préconfigurés et produit des JSONL séparés dans `data/raw/`).
+- Fusion/déduplication Reddit :\
+  `python Projet_API/scripts/normalize_reddit.py --inputs "Projet_API/data/raw/*.jsonl" --output Projet_API/data/clean/reddit_clean.jsonl`
