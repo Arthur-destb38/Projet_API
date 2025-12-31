@@ -2,10 +2,11 @@
 
 Objectif: scripts Selenium pour scraper des posts publics (Twitter/X, Reddit, Bluesky) sur les cryptomonnaies, normaliser les données et préparer l’analyse (sentiment finance).
 
-Arborescence:
-- `scripts/` : scrapers et helpers.
-- `data/raw/` : sorties brutes (JSONL/CSV) par plateforme.
-- `data/clean/` : données normalisées prêtes pour l’analyse.
+Arborescence (simplifiée):
+- `api/` : service FastAPI (ex-Projet_API-niama) avec endpoints scraping/sentiment/prix/économétrie
+- `scripts/` : scrapers et helpers standalone (HTTP/Selenium, batch, normalisation)
+- `data/raw/` : sorties brutes (JSONL/CSV) par plateforme
+- `data/clean/` : données normalisées prêtes pour l’analyse
 
 Prérequis rapides:
 - Python 3.9+, Chrome installé.
@@ -30,3 +31,12 @@ Prérequis rapides:
   (lance les 4 scrapes préconfigurés et produit des JSONL séparés dans `data/raw/`).
 - Fusion/déduplication Reddit :\
   `python Projet_API/scripts/normalize_reddit.py --inputs "Projet_API/data/raw/*.jsonl" --output Projet_API/data/clean/reddit_clean.jsonl`
+
+## Service API (api/)
+- Dossier `api/` (FastAPI) : endpoints `/scrape` (méthode `method=http` par défaut ou `selenium`), `/sentiment`, `/prices/{crypto}`, `/analyze`, `/econometrics`.
+- Lancer en local :\
+  ```
+  cd api
+  poetry install
+  poetry run uvicorn app.main:app --reload
+  ```
