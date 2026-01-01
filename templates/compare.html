@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Comparaison des methodes</title>
+    <style>
+        body { font-family: sans-serif; max-width: 900px; margin: 40px auto; padding: 20px; }
+        h1 { margin-bottom: 30px; }
+        .compare-box { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        .box { background: #f8f9fa; padding: 20px; border-radius: 8px; }
+        .box h2 { margin-bottom: 15px; }
+        .box.selenium { border-left: 4px solid #007bff; }
+        .box.http { border-left: 4px solid #28a745; }
+        .stat { margin: 10px 0; }
+        .stat span { font-weight: bold; }
+        button { padding: 12px 24px; font-size: 1rem; cursor: pointer; margin-top: 20px; }
+        .loading { color: #666; font-style: italic; }
+    </style>
+</head>
+<body>
+    <h1>Comparaison des methodes de scraping</h1>
+    
+    <button onclick="runCompare()">Lancer la comparaison (30 posts)</button>
+    
+    <div id="result" style="margin-top: 30px;"></div>
+    
+    <script>
+        async function runCompare() {
+            document.getElementById('result').innerHTML = '<p class="loading">Comparaison en cours...</p>';
+            
+            const response = await fetch('/compare?subreddit=Bitcoin&limit=30', { method: 'POST' });
+            const data = await response.json();
+            
+            document.getElementById('result').innerHTML = `
+                <div class="compare-box">
+                    <div class="box selenium">
+                        <h2>Selenium (cours)</h2>
+                        <div class="stat">Temps: <span>${data.selenium.time}s</span></div>
+                        <div class="stat">Posts: <span>${data.selenium.posts}</span></div>
+                        <div class="stat">Exemple: ${data.selenium.sample[0]}</div>
+                    </div>
+                    <div class="box http">
+                        <h2>HTTP/JSON (bonus)</h2>
+                        <div class="stat">Temps: <span>${data.http.time}s</span></div>
+                        <div class="stat">Posts: <span>${data.http.posts}</span></div>
+                        <div class="stat">Exemple: ${data.http.sample[0]}</div>
+                    </div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
