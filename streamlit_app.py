@@ -1,7 +1,6 @@
 """
 Crypto Sentiment - Streamlit
 Projet MoSEF 2024-2025
-Deux methodes: Selenium (cours) et HTTP (bonus)
 """
 
 import streamlit as st
@@ -17,16 +16,23 @@ from datetime import datetime, timedelta
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
-# Selenium - import conditionnel
+# Selenium
 try:
     from selenium import webdriver
     from selenium.webdriver.common.by import By
     from selenium.webdriver.chrome.options import Options
     from selenium.common.exceptions import NoSuchElementException
     from bs4 import BeautifulSoup
-    SELENIUM_AVAILABLE = True
+    SELENIUM_OK = True
 except ImportError:
-    SELENIUM_AVAILABLE = False
+    SELENIUM_OK = False
+
+# Econometrie
+try:
+    from econometrics import run_full_analysis
+    ECONO_OK = True
+except ImportError:
+    ECONO_OK = False
 
 
 # ============ CONFIG ============
@@ -68,7 +74,6 @@ def clean_text(text):
 # ============ SCRAPER HTTP ============
 
 def scrape_http(subreddit, limit=50):
-    """Scrape via API JSON Reddit"""
     posts = []
     after = None
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0"}
@@ -99,6 +104,7 @@ def scrape_http(subreddit, limit=50):
                 "score": d.get("score", 0),
                 "num_comments": d.get("num_comments", 0),
                 "author": d.get("author"),
+                "created_utc": d.get("created_utc"),
             })
 
             if len(posts) >= limit:
@@ -116,29 +122,22 @@ def scrape_http(subreddit, limit=50):
 # ============ SCRAPER SELENIUM ============
 
 def scrape_selenium(subreddit, limit=50):
-    """Scrape avec Selenium (methode cours)"""
-
-    if not SELENIUM_AVAILABLE:
-        st.error("Selenium non installe. Utilise: pip install selenium beautifulsoup4 lxml")
+    if not SELENIUM_OK:
+        st.error("Selenium non installe")
         return []
 
     posts = []
 
-    # Setup Chrome
     options = Options()
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0")
-    options.add_argument("--window-size=1920,1080")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
 
     try:
         driver = webdriver.Chrome(options=options)
-        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
-            "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-        })
     except Exception as e:
         st.error(f"Erreur Chrome: {e}")
         return []
@@ -152,12 +151,10 @@ def scrape_selenium(subreddit, limit=50):
         max_pages = (limit // 25) + 2
 
         while len(posts) < limit and pages < max_pages:
-            # Scroll
             for _ in range(2):
                 driver.execute_script(f"window.scrollBy(0, {random.randint(300, 600)});")
                 time.sleep(random.uniform(0.5, 1.0))
 
-            # Parse
             soup = BeautifulSoup(driver.page_source, "lxml")
             elements = soup.select("div.thing.link")
 
@@ -183,8 +180,14 @@ def scrape_selenium(subreddit, limit=50):
                     match = re.search(r"(\d+)", comments_txt)
                     num_comments = int(match.group(1)) if match else 0
 
-                    author_el = elem.select_one("a.author")
-                    author = author_el.get_text(strip=True) if author_el else "[deleted]"
+                    time_el = elem.select_one("time")
+                    timestamp = None
+                    if time_el and time_el.get("datetime"):
+                        try:
+                            dt = datetime.fromisoformat(time_el.get("datetime").replace("Z", "+00:00"))
+                            timestamp = dt.timestamp()
+                        except:
+                            pass
 
                     if title:
                         posts.append({
@@ -193,7 +196,8 @@ def scrape_selenium(subreddit, limit=50):
                             "text": "",
                             "score": score,
                             "num_comments": num_comments,
-                            "author": author,
+                            "author": "",
+                            "created_utc": timestamp,
                         })
                 except:
                     continue
@@ -201,7 +205,6 @@ def scrape_selenium(subreddit, limit=50):
                 if len(posts) >= limit:
                     break
 
-            # Next page
             try:
                 next_btn = driver.find_element(By.CSS_SELECTOR, "span.next-button a")
                 next_btn.click()
@@ -211,7 +214,7 @@ def scrape_selenium(subreddit, limit=50):
                 break
 
     except Exception as e:
-        st.error(f"Erreur scraping: {e}")
+        st.error(f"Erreur: {e}")
     finally:
         driver.quit()
 
@@ -266,40 +269,23 @@ def get_prices(cryptos):
 
 # ============ PAGES ============
 
-def page_single():
-    """Analyse simple avec choix de methode"""
+def page_analyse():
     st.title("Crypto Sentiment Analyzer")
-    st.caption("Projet MoSEF 2024-2025 - Webscraping et NLP")
+    st.caption("Projet MoSEF 2024-2025")
 
     # Sidebar
     with st.sidebar:
         st.header("Parametres")
 
-        # Choix methode
-        st.subheader("Methode de scraping")
-        method = st.radio(
-            "Choisir",
-            ["HTTP/JSON (rapide)", "Selenium (cours)"],
-            help="HTTP: appel API direct. Selenium: vrai webscraping avec navigateur."
-        )
-
-        if "Selenium" in method:
-            if not SELENIUM_AVAILABLE:
-                st.warning("Selenium non disponible")
-            else:
-                st.info("Selenium: plus lent mais conforme au cours")
-
-        st.divider()
+        method = st.radio("Methode", ["HTTP/JSON (rapide)", "Selenium (cours)"])
 
         crypto_name = st.selectbox("Crypto", list(CRYPTO_LIST.keys()))
         config = CRYPTO_LIST[crypto_name]
 
-        # Limite differente selon methode
         if "HTTP" in method:
             limit = st.slider("Nombre de posts", 20, 1000, 50, 10)
         else:
             limit = st.slider("Nombre de posts", 20, 200, 50, 10)
-            st.caption("Selenium limite a 200 posts (temps)")
 
         st.divider()
         st.caption(f"Subreddit: r/{config['sub']}")
@@ -307,7 +293,7 @@ def page_single():
         run = st.button("Analyser", type="primary", use_container_width=True)
 
     # Prix
-    st.subheader("Prix en temps reel")
+    st.subheader("Prix")
     prices = get_prices(["bitcoin", "ethereum", "solana"])
 
     c1, c2, c3 = st.columns(3)
@@ -321,23 +307,11 @@ def page_single():
     st.divider()
 
     # Info methodes
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("""
-        **Selenium (cours)**
-        - Ouvre un vrai navigateur Chrome
-        - Simule comportement humain
-        - Parse le HTML avec BeautifulSoup
-        - Plus lent mais conforme au cours
-        """)
-    with col2:
-        st.markdown("""
-        **HTTP/JSON (bonus)**
-        - Appel direct API Reddit
-        - Pas de navigateur
-        - Reponse JSON structuree
-        - Rapide mais pas du "vrai" scraping
-        """)
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("**Selenium (cours):** navigateur, simulation humaine, parse HTML")
+    with c2:
+        st.markdown("**HTTP/JSON (bonus):** appel API direct, rapide")
 
     st.divider()
 
@@ -345,7 +319,7 @@ def page_single():
         method_key = "selenium" if "Selenium" in method else "http"
 
         # Scraping
-        with st.spinner(f"Scraping r/{config['sub']} avec {method_key.upper()}..."):
+        with st.spinner(f"Scraping r/{config['sub']}..."):
             start = time.time()
 
             if method_key == "selenium":
@@ -356,13 +330,13 @@ def page_single():
             scrape_time = time.time() - start
 
         if not posts:
-            st.error("Aucun post recupere")
+            st.error("Aucun post")
             return
 
-        st.success(f"{len(posts)} posts recuperes en {scrape_time:.1f}s ({method_key.upper()})")
+        st.success(f"{len(posts)} posts en {scrape_time:.1f}s ({method_key})")
 
         # Sentiment
-        with st.spinner("Analyse sentiment (FinBERT)..."):
+        with st.spinner("Analyse FinBERT..."):
             tokenizer, model = load_model()
 
             results = []
@@ -371,12 +345,18 @@ def page_single():
             for i, post in enumerate(posts):
                 text = clean_text(post["title"] + " " + post.get("text", ""))
                 if text and len(text) > 10:
-                    sentiment = analyze_sentiment(text, tokenizer, model)
-                    results.append(sentiment)
+                    sent = analyze_sentiment(text, tokenizer, model)
+                    results.append(sent)
                 else:
                     results.append({"score": 0, "label": "neutral"})
 
                 progress.progress((i + 1) / len(posts))
+
+        # Sauvegarde pour econometrie
+        st.session_state['last_posts'] = posts
+        st.session_state['last_results'] = results
+        st.session_state['last_crypto_id'] = config['id']
+        st.session_state['last_crypto_name'] = crypto_name
 
         # Stats
         scores = [r["score"] for r in results]
@@ -389,12 +369,11 @@ def page_single():
         # Metriques
         st.subheader("Resultats")
 
-        c1, c2, c3, c4, c5 = st.columns(5)
+        c1, c2, c3, c4 = st.columns(4)
         c1.metric("Methode", method_key.upper())
-        c2.metric("Temps", f"{scrape_time:.1f}s")
-        c3.metric("Posts", len(results))
-        c4.metric("Sentiment", f"{avg:+.3f}")
-        c5.metric("Positifs", f"{labels['positive']}/{len(results)}")
+        c2.metric("Posts", len(results))
+        c3.metric("Sentiment", f"{avg:+.3f}")
+        c4.metric("Positifs", f"{labels['positive']}/{len(results)}")
 
         # Graphiques
         col1, col2 = st.columns(2)
@@ -403,23 +382,22 @@ def page_single():
             fig = px.pie(
                 values=list(labels.values()),
                 names=["Positif", "Negatif", "Neutre"],
-                color_discrete_sequence=["#28a745", "#dc3545", "#6c757d"],
-                title="Distribution des sentiments"
+                color_discrete_sequence=["#28a745", "#dc3545", "#6c757d"]
             )
             st.plotly_chart(fig, use_container_width=True)
 
         with col2:
-            fig = px.histogram(x=scores, nbins=20, title="Distribution des scores")
+            fig = px.histogram(x=scores, nbins=20)
             fig.add_vline(x=0, line_dash="dash", line_color="gray")
-            fig.add_vline(x=avg, line_color="red", annotation_text=f"Moy: {avg:.3f}")
+            fig.add_vline(x=avg, line_color="red")
             st.plotly_chart(fig, use_container_width=True)
 
         # Tableau
-        st.subheader("Posts analyses")
+        st.subheader("Posts")
 
         df = pd.DataFrame([
             {
-                "Titre": posts[i]["title"][:70],
+                "Titre": posts[i]["title"][:60],
                 "Score": round(results[i]["score"], 3),
                 "Label": results[i]["label"],
                 "Upvotes": posts[i].get("score", 0)
@@ -427,213 +405,282 @@ def page_single():
             for i in range(len(results))
         ])
 
-        tab1, tab2, tab3 = st.tabs(["Tous", "Positifs", "Negatifs"])
+        st.dataframe(df, use_container_width=True, height=400)
+        st.download_button("CSV", df.to_csv(index=False), f"sentiment_{config['id']}.csv")
 
-        with tab1:
-            st.dataframe(df, use_container_width=True, height=400)
-        with tab2:
-            st.dataframe(df[df["Label"] == "positive"].sort_values("Score", ascending=False), use_container_width=True)
-        with tab3:
-            st.dataframe(df[df["Label"] == "negative"].sort_values("Score"), use_container_width=True)
+        st.info("Donnees sauvegardees! Va dans 'Econometrie' pour les tests statistiques.")
 
-        st.download_button("Telecharger CSV", df.to_csv(index=False), f"sentiment_{config['id']}_{method_key}.csv")
+
+def page_econometrie():
+    st.title("Analyse Econometrique")
+    st.caption("ADF, Granger, VAR, Cross-correlation")
+
+    if not ECONO_OK:
+        st.error("Module econometrics.py non trouve")
+        st.code("pip install statsmodels scipy")
+        return
+
+    if 'last_posts' not in st.session_state:
+        st.warning("Lance d'abord une analyse dans 'Analyse'")
+        return
+
+    posts = st.session_state['last_posts']
+    results = st.session_state['last_results']
+    crypto_id = st.session_state.get('last_crypto_id', 'bitcoin')
+    crypto_name = st.session_state.get('last_crypto_name', 'Bitcoin')
+
+    st.success(f"Donnees: {len(posts)} posts ({crypto_name})")
+
+    with st.sidebar:
+        st.header("Parametres")
+        days = st.slider("Jours historiques", 30, 90, 60)
+        max_lag = st.slider("Lag max", 3, 10, 5)
+        run = st.button("Lancer tests", type="primary", use_container_width=True)
+
+    # Explication
+    with st.expander("Explication des tests"):
+        st.markdown("""
+        **ADF:** teste la stationnarite (p < 0.05 = stationnaire)
+        
+        **Granger:** teste si X predit Y (p < 0.05 = causalite)
+        
+        **VAR:** modele vectoriel autoregressif
+        
+        **Cross-corr:** correlation a differents lags
+        """)
+
+    if run:
+        with st.spinner("Tests en cours..."):
+            output = run_full_analysis(posts, results, crypto_id, days, max_lag)
+
+        if output["status"] == "error":
+            st.error(output.get("error"))
+            return
+
+        # Donnees
+        st.subheader("1. Donnees")
+        info = output["data_info"]
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Jours sentiment", info["jours_sentiment"])
+        c2.metric("Jours prix", info["jours_prix"])
+        c3.metric("Jours fusionnes", info["jours_merged"])
+        st.caption(f"{info['date_debut']} -> {info['date_fin']}")
+
+        st.divider()
+
+        # ADF
+        st.subheader("2. Stationnarite (ADF)")
+        adf = output["adf_tests"]
+        c1, c2 = st.columns(2)
+
+        with c1:
+            st.markdown("**Sentiment**")
+            s = adf.get("sentiment", {})
+            if "error" not in s:
+                st.write(f"p-value: {s.get('pvalue')}")
+                if s.get("stationary"):
+                    st.success("Stationnaire")
+                else:
+                    st.warning("Non stationnaire")
+
+        with c2:
+            st.markdown("**Returns**")
+            r = adf.get("returns", {})
+            if "error" not in r:
+                st.write(f"p-value: {r.get('pvalue')}")
+                if r.get("stationary"):
+                    st.success("Stationnaire")
+                else:
+                    st.warning("Non stationnaire")
+
+        st.divider()
+
+        # Granger
+        st.subheader("3. Granger Causality")
+        granger = output["granger"]
+
+        if "error" not in granger:
+            c1, c2 = st.columns(2)
+
+            with c1:
+                st.markdown("**Sentiment -> Returns**")
+                s2r = granger.get("sentiment_to_returns", {})
+                if s2r.get("significant"):
+                    st.success(f"SIGNIFICATIF (lag={s2r.get('best_lag')})")
+                else:
+                    st.warning("Non significatif")
+
+                if s2r.get("pvalues"):
+                    df_p = pd.DataFrame({"Lag": list(s2r["pvalues"].keys()), "P-val": list(s2r["pvalues"].values())})
+                    st.dataframe(df_p, hide_index=True)
+
+            with c2:
+                st.markdown("**Returns -> Sentiment**")
+                r2s = granger.get("returns_to_sentiment", {})
+                if r2s.get("significant"):
+                    st.success(f"SIGNIFICATIF (lag={r2s.get('best_lag')})")
+                else:
+                    st.warning("Non significatif")
+
+                if r2s.get("pvalues"):
+                    df_p = pd.DataFrame({"Lag": list(r2s["pvalues"].keys()), "P-val": list(r2s["pvalues"].values())})
+                    st.dataframe(df_p, hide_index=True)
+
+        st.divider()
+
+        # VAR
+        st.subheader("4. VAR")
+        var = output["var"]
+        if "error" not in var:
+            c1, c2 = st.columns(2)
+            c1.metric("Lag optimal", var.get("optimal_lag"))
+            c2.metric("AIC", var.get("aic"))
+
+        st.divider()
+
+        # Cross-corr
+        st.subheader("5. Cross-correlation")
+        cross = output["cross_corr"]
+
+        if cross.get("correlations"):
+            corrs = cross["correlations"]
+
+            fig = go.Figure()
+            fig.add_trace(go.Bar(
+                x=list(corrs.keys()),
+                y=list(corrs.values()),
+                marker_color=['red' if v < 0 else 'green' for v in corrs.values()]
+            ))
+            fig.add_hline(y=0, line_dash="dash")
+            fig.update_layout(xaxis_title="Lag", yaxis_title="Correlation")
+            st.plotly_chart(fig, use_container_width=True)
+
+            st.metric("Meilleur lag", cross.get("best_lag"))
+            st.metric("Correlation", cross.get("best_correlation"))
+
+        st.divider()
+
+        # Graphique
+        st.subheader("6. Visualisation")
+        merged = output.get("merged_data")
+
+        if merged is not None:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=merged['date'], y=merged['sentiment_mean'], name="Sentiment", yaxis="y1"))
+            fig.add_trace(go.Scatter(x=merged['date'], y=merged['log_return'], name="Return", yaxis="y2"))
+            fig.update_layout(
+                yaxis=dict(title="Sentiment", side="left"),
+                yaxis2=dict(title="Return", side="right", overlaying="y")
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        st.divider()
+
+        # Conclusion
+        st.subheader("7. Conclusion")
+        st.text(output.get("conclusion", ""))
 
 
 def page_compare():
-    """Comparaison des methodes"""
     st.title("Comparaison des methodes")
-    st.caption("Selenium (cours) vs HTTP/JSON (bonus)")
 
     with st.sidebar:
         crypto_name = st.selectbox("Crypto", list(CRYPTO_LIST.keys()))
         config = CRYPTO_LIST[crypto_name]
-
-        limit = st.slider("Posts", 10, 100, 30, 10)
-
+        limit = st.slider("Posts", 10, 100, 30)
         run = st.button("Comparer", type="primary", use_container_width=True)
 
-    # Tableau comparatif
-    st.subheader("Differences")
-
     st.markdown("""
-    | Aspect | Selenium | HTTP/JSON |
-    |--------|----------|-----------|
-    | Technique | Webscraping HTML | Appel API |
-    | Navigateur | Oui (Chrome) | Non |
-    | BeautifulSoup | Oui | Non |
-    | Vitesse | Lent (~1s/post) | Rapide (~0.01s/post) |
-    | Limite posts | ~200 | ~1000 |
-    | Conforme cours | **OUI** | NON |
+    | Aspect | Selenium | HTTP |
+    |--------|----------|------|
+    | Navigateur | Oui | Non |
+    | Vitesse | Lent | Rapide |
+    | Cours | OUI | NON |
     """)
 
-    st.divider()
-
     if run:
-        if not SELENIUM_AVAILABLE:
-            st.error("Selenium non disponible pour la comparaison")
-            return
+        c1, c2 = st.columns(2)
 
-        col1, col2 = st.columns(2)
-
-        # HTTP
-        with col1:
-            st.subheader("HTTP/JSON")
-            with st.spinner("Scraping HTTP..."):
-                start = time.time()
-                http_posts = scrape_http(config['sub'], limit)
-                http_time = time.time() - start
-
+        with c1:
+            st.subheader("HTTP")
+            start = time.time()
+            http_posts = scrape_http(config['sub'], limit)
+            http_time = time.time() - start
             st.metric("Temps", f"{http_time:.2f}s")
             st.metric("Posts", len(http_posts))
-            if http_posts:
-                st.write("Exemple:", http_posts[0]["title"][:50] + "...")
 
-        # Selenium
-        with col2:
+        with c2:
             st.subheader("Selenium")
-            with st.spinner("Scraping Selenium..."):
+            if SELENIUM_OK:
                 start = time.time()
                 sel_posts = scrape_selenium(config['sub'], limit)
                 sel_time = time.time() - start
+                st.metric("Temps", f"{sel_time:.2f}s")
+                st.metric("Posts", len(sel_posts))
+            else:
+                st.error("Selenium non dispo")
+                sel_time = 1
 
-            st.metric("Temps", f"{sel_time:.2f}s")
-            st.metric("Posts", len(sel_posts))
-            if sel_posts:
-                st.write("Exemple:", sel_posts[0]["title"][:50] + "...")
-
-        # Resume
-        st.divider()
-        st.subheader("Resume")
-
-        df = pd.DataFrame({
-            "Methode": ["HTTP/JSON", "Selenium"],
-            "Temps (s)": [round(http_time, 2), round(sel_time, 2)],
-            "Posts": [len(http_posts), len(sel_posts)],
-            "Conforme cours": ["Non", "Oui"]
-        })
-        st.dataframe(df, use_container_width=True)
-
-        if http_time > 0:
-            ratio = sel_time / http_time
-            st.info(f"HTTP est **{ratio:.1f}x plus rapide** que Selenium")
-            st.warning("Mais Selenium est la methode demandee par le cours!")
+        if http_time > 0 and SELENIUM_OK:
+            st.info(f"HTTP est {sel_time/http_time:.1f}x plus rapide")
 
 
 def page_multi():
-    """Multi-crypto"""
-    st.title("Analyse Multi-Crypto")
-    st.caption("Analyse plusieurs cryptos en une fois")
+    st.title("Multi-Crypto")
 
     with st.sidebar:
-        selected = st.multiselect(
-            "Cryptos",
-            list(CRYPTO_LIST.keys()),
-            default=["Bitcoin (BTC)", "Ethereum (ETH)", "Solana (SOL)"]
-        )
-
-        method = st.radio("Methode", ["HTTP/JSON", "Selenium"])
-
-        limit = st.slider("Posts par crypto", 20, 100, 30)
-
-        run = st.button("Analyser tout", type="primary", use_container_width=True)
+        selected = st.multiselect("Cryptos", list(CRYPTO_LIST.keys()),
+                                  default=["Bitcoin (BTC)", "Ethereum (ETH)", "Solana (SOL)"])
+        limit = st.slider("Posts/crypto", 20, 100, 30)
+        run = st.button("Analyser", type="primary", use_container_width=True)
 
     if run and selected:
         tokenizer, model = load_model()
         all_results = []
 
         progress = st.progress(0)
-        status = st.empty()
 
-        for i, crypto_name in enumerate(selected):
-            config = CRYPTO_LIST[crypto_name]
-            status.text(f"Scraping {crypto_name}...")
-
-            if "HTTP" in method:
-                posts = scrape_http(config['sub'], limit)
-            else:
-                posts = scrape_selenium(config['sub'], limit)
+        for i, name in enumerate(selected):
+            config = CRYPTO_LIST[name]
+            posts = scrape_http(config['sub'], limit)
 
             if posts:
-                status.text(f"Analyse {crypto_name}...")
                 scores = []
-                labs = {"positive": 0, "negative": 0, "neutral": 0}
-
                 for post in posts:
-                    text = clean_text(post["title"] + " " + post.get("text", ""))
-                    if text and len(text) > 10:
-                        sent = analyze_sentiment(text, tokenizer, model)
-                        scores.append(sent["score"])
-                        labs[sent["label"]] += 1
+                    text = clean_text(post["title"])
+                    if text:
+                        s = analyze_sentiment(text, tokenizer, model)
+                        scores.append(s["score"])
 
                 avg = sum(scores) / len(scores) if scores else 0
-
-                all_results.append({
-                    "Crypto": crypto_name,
-                    "Posts": len(scores),
-                    "Sentiment": round(avg, 4),
-                    "Positifs": labs["positive"],
-                    "Negatifs": labs["negative"],
-                    "Neutres": labs["neutral"]
-                })
+                all_results.append({"Crypto": name, "Posts": len(scores), "Sentiment": round(avg, 4)})
 
             progress.progress((i + 1) / len(selected))
-
-        status.text("Termine!")
-
-        # Resultats
-        st.subheader("Resultats")
 
         df = pd.DataFrame(all_results)
         st.dataframe(df, use_container_width=True)
 
-        # Graphique
-        fig = px.bar(
-            df, x="Crypto", y="Sentiment", color="Sentiment",
-            color_continuous_scale=["red", "gray", "green"],
-            title="Sentiment par crypto"
-        )
+        fig = px.bar(df, x="Crypto", y="Sentiment", color="Sentiment",
+                     color_continuous_scale=["red", "gray", "green"])
         fig.add_hline(y=0, line_dash="dash")
         st.plotly_chart(fig, use_container_width=True)
 
-        st.download_button("Telecharger CSV", df.to_csv(index=False), "multi_crypto_sentiment.csv")
 
-
-def page_about():
-    """Methodologie"""
+def page_methodo():
     st.title("Methodologie")
 
     st.markdown("""
-    ## Objectif
+    ## Pipeline
     
-    Analyser le sentiment des discussions Reddit sur les cryptomonnaies 
-    et reproduire les methodologies des papiers academiques.
-    
-    ## Deux methodes de scraping
-    
-    ### Selenium (conforme au cours)
-```python
-    driver = webdriver.Chrome()
-    driver.get("https://old.reddit.com/r/Bitcoin")
-    soup = BeautifulSoup(driver.page_source, "lxml")
-    posts = soup.select("div.thing.link")
-```
-    
-    ### HTTP/JSON (bonus)
-```python
-    resp = requests.get("https://old.reddit.com/r/Bitcoin/new.json")
-    data = resp.json()
-```
-    
-    ## Pipeline NLP
-    
-    1. Nettoyage (URLs, mentions, caracteres speciaux)
-    2. FinBERT (modele specialise finance)
-    3. Score: P(positif) - P(negatif)
+    1. Scraping Reddit (Selenium ou HTTP)
+    2. Nettoyage texte
+    3. FinBERT sentiment
+    4. Tests econometriques (Granger, VAR)
     
     ## References
     
-    - Kraaijeveld & De Smedt (2020) - Twitter sentiment for crypto
-    - ProsusAI/FinBERT - Financial sentiment model
+    - Kraaijeveld & De Smedt (2020) - Twitter sentiment
+    - ProsusAI/FinBERT
     """)
 
 
@@ -642,17 +689,19 @@ def page_about():
 def main():
     page = st.sidebar.radio(
         "Navigation",
-        ["Analyse", "Comparaison", "Multi-crypto", "Methodologie"]
+        ["Analyse", "Econometrie", "Comparaison", "Multi-crypto", "Methodologie"]
     )
 
     if page == "Analyse":
-        page_single()
+        page_analyse()
+    elif page == "Econometrie":
+        page_econometrie()
     elif page == "Comparaison":
         page_compare()
     elif page == "Multi-crypto":
         page_multi()
     else:
-        page_about()
+        page_methodo()
 
 
 if __name__ == "__main__":
