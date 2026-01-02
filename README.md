@@ -1,42 +1,46 @@
 # Projet_API
 
-Objectif: scripts Selenium pour scraper des posts publics (Twitter/X, Reddit, Bluesky) sur les cryptomonnaies, normaliser les données et préparer l’analyse (sentiment finance).
+Analyse de sentiment crypto : scraping (HTTP/Selenium), normalisation, FastAPI et interface Streamlit.
 
-Arborescence (simplifiée):
-- `api/` : service FastAPI (ex-Projet_API-niama) avec endpoints scraping/sentiment/prix/économétrie
-- `scripts/` : scrapers et helpers standalone (HTTP/Selenium, batch, normalisation)
-- `data/raw/` : sorties brutes (JSONL/CSV) par plateforme
-- `data/clean/` : données normalisées prêtes pour l’analyse
+## Structure
+- `api/` : service FastAPI (scraping, sentiment, prix, économétrie)
+- `scripts/` : scrapers/normalisation batch
+- `data/raw/` : sorties brutes (JSONL/CSV)
+- `data/clean/` : données normalisées
+- `notebooks/` : démos et explorations (voir `getting_started.ipynb`)
 
-Prérequis rapides:
-- Python 3.9+, Chrome installé.
-- (Optionnel) `python3 -m venv .venv && source .venv/bin/activate`
-- `pip install -r ../requirements.txt`
+## Prérequis
+- Python 3.11 recommandé (Poetry) ; Chrome installé si Selenium.
+- Installer via Poetry :
+  ```
+  export PATH="$HOME/Library/Python/3.14/bin:$PATH"   # si poetry est ici
+  POETRY_VIRTUALENVS_IN_PROJECT=1 poetry install --no-root
+  ```
 
-## Chronologie et solutions
-- Tentative initiale Selenium sur reddit.com (new UI) → bloqué par pop-up cookies/captcha et résolution DNS pour télécharger ChromeDriver.
-- Ajout des dépendances `selenium` + `webdriver_manager`, détection du binaire Chrome local et possibilité de forcer la version de ChromeDriver (env `CHROME_BINARY`, `CHROMEDRIVER_VERSION` ou `CHROMEDRIVER`).
-- Bascule vers old.reddit.com pour réduire le JS, mais pop-up + anti-bot restaient un frein à l’automatisation.
-- Résolution: passage à l’API JSON publique de old.reddit.com (pas de Selenium), récupération directe des posts au format JSON → succès avec 100 posts sur r/CryptoCurrency.
+## Lancer l’API
+```
+cd api
+POETRY_VIRTUALENVS_IN_PROJECT=1 poetry run uvicorn app.main:app --reload
+```
+Endpoints clés : `/health`, `/cryptos`, `/prices`, `/scrape`, `/analyze`, `/analyze/multi`.
 
-## Scraper Reddit (HTTP, sans Selenium)
-- Commande exemple :\
-  `python Projet_API/scripts/scrape_reddit_http.py --query "bitcoin OR ethereum" --subreddit CryptoCurrency --limit 100 --output Projet_API/data/raw/reddit_http.jsonl`
-- Pourquoi ça marche : old.reddit.com expose un endpoint JSON public qui évite cookies/captcha; les données (titre+texte, auteur, score, commentaires, lien, timestamp) sont directement accessibles.
-- Fichier généré (exécution réussie) : `Projet_API/data/raw/reddit_http.jsonl` (100 posts).
+## Streamlit
+Interface locale :
+```
+POETRY_VIRTUALENVS_IN_PROJECT=1 poetry run streamlit run streamlit_app.py
+```
+
+## Scraper Reddit (HTTP)
+- Exemple :
+  ```
+  python scripts/scrape_reddit_http.py --query "bitcoin OR ethereum" --subreddit CryptoCurrency --limit 100 --output data/raw/reddit_http.jsonl
+  ```
+- Pourquoi HTTP : old.reddit.com expose un JSON public, évite cookies/captcha et le JS lourd.
 
 ## Batch et normalisation
-- Batch multi-queries/subreddits :\
-  `python Projet_API/scripts/run_reddit_batch.py` \
-  (lance les 4 scrapes préconfigurés et produit des JSONL séparés dans `data/raw/`).
-- Fusion/déduplication Reddit :\
-  `python Projet_API/scripts/normalize_reddit.py --inputs "Projet_API/data/raw/*.jsonl" --output Projet_API/data/clean/reddit_clean.jsonl`
+- Batch multi-subreddits : `python scripts/run_reddit_batch.py`
+- Fusion/déduplication : `python scripts/normalize_reddit.py --inputs "data/raw/*.jsonl" --output data/clean/reddit_clean.jsonl`
 
-## Service API (api/)
-- Dossier `api/` (FastAPI) : endpoints `/scrape` (méthode `method=http` par défaut ou `selenium`), `/sentiment`, `/prices/{crypto}`, `/analyze`, `/econometrics`.
-- Lancer en local :\
-  ```
-  cd api
-  poetry install
-  poetry run uvicorn app.main:app --reload
-  ```
+## Notes Selenium
+- Optionnel : `method=selenium` sur `/scrape` ou `/analyze`.
+- Nécessite un driver Chrome/Firefox accessible (headless par défaut).
