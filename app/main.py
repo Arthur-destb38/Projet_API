@@ -16,6 +16,8 @@ from app.sentiment import SentimentAnalyzer
 from app.prices import CryptoPrices
 from app.utils import clean_text
 
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 app = FastAPI(
     title="Crypto Sentiment API",
